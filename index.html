@@ -147,7 +147,7 @@ const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','A
 let state = { items: [], loans: [] };
 let cursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let page = 'month', editId = null, editLoanId = null, valueId = null, currentGroup = 'bills';
-let collapsedGroups = {}; // Controle para recolher/expandir grupos
+let collapsedGroups = {};
 
 function showLoading(show){ document.getElementById('loading').classList.toggle('active', show); }
 
@@ -157,7 +157,7 @@ onSnapshot(docRef, (docSnap) => {
     if (!state.items) state.items = [];
     if (!state.loans) state.loans = [];
   } else {
-    state = seed();
+    state = { items: [], loans: [] };
     save();
   }
   render();
@@ -171,18 +171,6 @@ function save(){
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function key(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
 function money(v){ return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
-
-function seed(){
-  const k = key(new Date());
-  return {
-    items: [
-      { id: uid(), group: 'income', name: 'Salário', desc: 'Salário mensal', value: 3000, recurring: true, months: '', start: k, deletedFrom: null, overrides: {}, paid: {} },
-      { id: uid(), group: 'ap', name: 'Exemplo AP', desc: 'Gerenciador AP', value: 100, recurring: false, months: '', start: k, deletedFrom: null, overrides: {}, paid: {} },
-      { id: uid(), group: 'bills', name: 'Condomínio', desc: 'Condomínio apartamento', value: 650, recurring: true, months: '', start: k, deletedFrom: null, overrides: {}, paid: {} }
-    ],
-    loans: []
-  };
-}
 
 function active(x){
   const k = key(cursor);
@@ -462,7 +450,6 @@ function setTab(activeTab){
   activeTab.classList.add('active');
 }
 
-// 🧾 Gerador de PDF Completo da Página (Atualizado com o novo grupo AP)
 function pdf(){
   const t = totals();
   const currentMonthName = months[cursor.getMonth()] + ' / ' + cursor.getFullYear();
