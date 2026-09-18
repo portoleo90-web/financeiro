@@ -148,6 +148,7 @@ let state = { items: [], loans: [] };
 let cursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let page = 'month', editId = null, editLoanId = null, valueId = null, currentGroup = 'bills';
 let collapsedGroups = {};
+let hideValues = false; // Estado de ocultar/exibir valores
 
 function showLoading(show){ document.getElementById('loading').classList.toggle('active', show); }
 
@@ -170,7 +171,12 @@ function save(){
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function key(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
-function money(v){ return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+
+// Função money formatando e respeitando a flag de ocultar valores
+function money(v){ 
+  if (hideValues) return "••••••";
+  return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); 
+}
 
 function active(x){
   const k = key(cursor);
@@ -220,7 +226,14 @@ function renderMonth(){
   [['Receitas', t.inc, 'green'], ['Despesas', t.exp, 'red'], ['Total Pago', t.paid, 'green'], ['Total a Pagar', t.pending, 'red'], ['Resultado Previsto', t.result, t.result >= 0 ? 'green' : 'red']]
   .forEach(c => h += `<div class="card"><small>${c[0]}</small><div class="money ${c[2]}">${money(c[1])}</div></div>`);
   
-  h += '</section><div class="fabrow"><button class="secondary" id="btnPdf">🧾 Gerar PDF Relatório</button></div>';
+  // Linha com o botão de Ocultar Valores e de PDF
+  h += `</section>
+  <div class="fabrow">
+    <button class="secondary" id="btnToggleHide" title="${hideValues ? 'Exibir Valores' : 'Ocultar Valores'}">
+      ${hideValues ? '🙈 Mostrar Valores' : '👁️ Ocultar Valores'}
+    </button>
+    <button class="secondary" id="btnPdf">🧾 Gerar PDF Relatório</button>
+  </div>`;
   
   for (const [g, title, color] of groups){
     const arr = items(g), total = arr.reduce((a, x) => a + val(x), 0);
@@ -319,6 +332,14 @@ function attachEvents(){
     collapsedGroups[g] = !collapsedGroups[g];
     renderMonth();
   });
+  
+  // Evento do novo botão de Ocultar/Mostrar Valores
+  const toggleBtn = document.getElementById('btnToggleHide');
+  if (toggleBtn) toggleBtn.onclick = () => {
+    hideValues = !hideValues;
+    renderMonth();
+  };
+
   const pdfBtn = document.getElementById('btnPdf'); if(pdfBtn) pdfBtn.onclick = pdf;
 }
 
@@ -461,6 +482,11 @@ function pdf(){
     ['payable', 'Empréstimos a pagar', '#d63838']
   ];
 
+  // Para o PDF, formatamos sempre mostrando os valores reais
+  function pdfMoney(v){
+    return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
   let tablesHtml = '';
 
   for (const [g, title, color] of groups){
@@ -471,7 +497,7 @@ function pdf(){
       <div style="margin-bottom:20px;">
         <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid ${color};padding-bottom:5px;margin-bottom:8px;">
           <h3 style="margin:0;color:${color};font-size:16px;">${title}</h3>
-          <span style="font-weight:bold;color:${color}">${money(total)}</span>
+          <span style="font-weight:bold;color:${color}">${pdfMoney(total)}</span>
         </div>
         ${arr.length === 0 ? '<p style="color:#777;font-size:12px;margin:5px 0;">Nenhum item cadastrado neste mês.</p>' : `
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -493,7 +519,7 @@ function pdf(){
                       ${isPaid(x) ? 'PAGO' : 'A PAGAR'}
                     </span>
                   </td>
-                  <td style="padding:6px;border-bottom:1px solid #eee;text-align:right;font-weight:bold;">${money(val(x))}</td>
+                  <td style="padding:6px;border-bottom:1px solid #eee;text-align:right;font-weight:bold;">${pdfMoney(val(x))}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -539,19 +565,19 @@ function pdf(){
       </div>
 
       <div class="summary-box">
-        <div class="summary-card"><small>Receitas</small><div class="green">${money(t.inc)}</div></div>
-        <div class="summary-card"><small>Despesas</small><div class="red">${money(t.exp)}</div></div>
-        <div class="summary-card"><small>Total Pago</small><div class="green">${money(t.paid)}</div></div>
-        <div class="summary-card"><small>Total a Pagar</small><div class="red">${money(t.pending)}</div></div>
-        <div class="summary-card"><small>Resultado</small><div class="${t.result >= 0 ? 'green' : 'red'}">${money(t.result)}</div></div>
+        <div class="summary-card"><small>Receitas</small><div class="green">${pdfMoney(t.inc)}</div></div>
+        <div class="summary-card"><small>Despesas</small><div class="red">${pdfMoney(t.exp)}</div></div>
+        <div class="summary-card"><small>Total Pago</small><div class="green">${pdfMoney(t.paid)}</div></div>
+        <div class="summary-card"><small>Total a Pagar</small><div class="red">${pdfMoney(t.pending)}</div></div>
+        <div class="summary-card"><small>Resultado</small><div class="${t.result >= 0 ? 'green' : 'red'}">${pdfMoney(t.result)}</div></div>
       </div>
 
       ${tablesHtml}
 
       <div class="footer-summary">
-        <span>Total Pago: <span class="green">${money(t.paid)}</span></span>
-        <span>A Pagar: <span class="red">${money(t.pending)}</span></span>
-        <span>Resultado Previsto: <span class="${t.result >= 0 ? 'green' : 'red'}">${money(t.result)}</span></span>
+        <span>Total Pago: <span class="green">${pdfMoney(t.paid)}</span></span>
+        <span>A Pagar: <span class="red">${pdfMoney(t.pending)}</span></span>
+        <span>Resultado Previsto: <span class="${t.result >= 0 ? 'green' : 'red'}">${pdfMoney(t.result)}</span></span>
       </div>
 
       <script>
