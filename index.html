@@ -131,14 +131,13 @@ import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/f
 
 // ⚠️ SUBSTITUA PELAS SUAS CHAVES DO FIREBASE AQUI:
 const firebaseConfig = {
-  apiKey: "AIzaSyDDf0eXdNJ0G-yw-uSvb8WXbEBPpIANnoo",
-  authDomain: "meu-controle-financeiro-af5ef.firebaseapp.com",
-  projectId: "meu-controle-financeiro-af5ef",
-  storageBucket: "meu-controle-financeiro-af5ef.firebasestorage.app",
-  messagingSenderId: "663422499675",
-  appId: "1:663422499675:web:7c32308ae95f5bbaff387e"
+  apiKey: "SEU_API_KEY",
+  authDomain: "SEU_PROJECT_ID.firebaseapp.com",
+  projectId: "SEU_PROJECT_ID",
+  storageBucket: "SEU_PROJECT_ID.appspot.com",
+  messagingSenderId: "SEU_MESSAGING_SENDER_ID",
+  appId: "SEU_APP_ID"
 };
-
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -148,6 +147,7 @@ const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','A
 let state = { items: [], loans: [] };
 let cursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let page = 'month', editId = null, editLoanId = null, valueId = null, currentGroup = 'bills';
+let collapsedGroups = {}; // Controle para recolher/expandir grupos
 
 function showLoading(show){ document.getElementById('loading').classList.toggle('active', show); }
 
@@ -177,6 +177,7 @@ function seed(){
   return {
     items: [
       { id: uid(), group: 'income', name: 'Salário', desc: 'Salário mensal', value: 3000, recurring: true, months: '', start: k, deletedFrom: null, overrides: {}, paid: {} },
+      { id: uid(), group: 'ap', name: 'Exemplo AP', desc: 'Gerenciador AP', value: 100, recurring: false, months: '', start: k, deletedFrom: null, overrides: {}, paid: {} },
       { id: uid(), group: 'bills', name: 'Condomínio', desc: 'Condomínio apartamento', value: 650, recurring: true, months: '', start: k, deletedFrom: null, overrides: {}, paid: {} }
     ],
     loans: []
@@ -218,7 +219,15 @@ function render(){
 }
 
 function renderMonth(){
-  const t = totals(), groups = [['income', 'Receitas', 'green'], ['bills', 'Contas', '#1565c0'], ['cards', 'Cartões', '#673ab7'], ['payable', 'Empréstimos a pagar', 'red']];
+  const t = totals();
+  const groups = [
+    ['income', 'Receitas', '#18864b'],
+    ['ap', 'Gerenciador AP', '#e65100'],
+    ['bills', 'Contas', '#1565c0'],
+    ['cards', 'Cartões', '#673ab7'],
+    ['payable', 'Empréstimos a pagar', '#d63838']
+  ];
+
   let h = '<section class="summary">';
   [['Receitas', t.inc, 'green'], ['Despesas', t.exp, 'red'], ['Total Pago', t.paid, 'green'], ['Total a Pagar', t.pending, 'red'], ['Resultado Previsto', t.result, t.result >= 0 ? 'green' : 'red']]
   .forEach(c => h += `<div class="card"><small>${c[0]}</small><div class="money ${c[2]}">${money(c[1])}</div></div>`);
@@ -227,19 +236,30 @@ function renderMonth(){
   
   for (const [g, title, color] of groups){
     const arr = items(g), total = arr.reduce((a, x) => a + val(x), 0);
-    h += `<section class="section"><div class="sectionhead"><h2 style="color:${color}">${title}</h2><span class="total" style="color:${color}">${money(total)}</span><button data-group="${g}" class="btnOpenForm">＋</button></div>`;
-    if (!arr.length) h += '<div class="empty">Nenhum item neste mês.</div>';
-    for (const x of arr){
-      h += `<div class="item ${isPaid(x) ? 'paid' : ''}">
-        <div><div class="name">${esc(x.name)}</div><div class="desc">${esc(x.desc)}</div></div>
-        <span class="status">${isPaid(x) ? 'Pago' : 'A pagar'}</span>
-        <button class="valuebtn" data-id="${x.id}">${money(val(x))}</button>
-        <div class="controls">
-          <button class="icon btnEditItem" title="Editar" data-group="${g}" data-id="${x.id}">✏️</button>
-          <button class="icon btnRemoveItem" title="Excluir" data-id="${x.id}">🗑️</button>
-          <label><input type="checkbox" class="chkPaid" data-id="${x.id}" ${isPaid(x) ? 'checked' : ''}></label>
-        </div>
+    const isCollapsed = collapsedGroups[g] || false;
+
+    h += `<section class="section">
+      <div class="sectionhead">
+        <button class="icon btnToggleGroup" data-group="${g}" title="${isCollapsed ? 'Expandir' : 'Recolher'}" style="font-size:13px;padding:4px 8px;font-weight:bold;">${isCollapsed ? '▶' : '▼'}</button>
+        <h2 style="color:${color}">${title}</h2>
+        <span class="total" style="color:${color}">${money(total)}</span>
+        <button data-group="${g}" class="btnOpenForm" title="Adicionar item">＋</button>
       </div>`;
+    
+    if (!isCollapsed) {
+      if (!arr.length) h += '<div class="empty">Nenhum item neste mês.</div>';
+      for (const x of arr){
+        h += `<div class="item ${isPaid(x) ? 'paid' : ''}">
+          <div><div class="name">${esc(x.name)}</div><div class="desc">${esc(x.desc)}</div></div>
+          <span class="status">${isPaid(x) ? 'Pago' : 'A pagar'}</span>
+          <button class="valuebtn" data-id="${x.id}">${money(val(x))}</button>
+          <div class="controls">
+            <button class="icon btnEditItem" title="Editar" data-group="${g}" data-id="${x.id}">✏️</button>
+            <button class="icon btnRemoveItem" title="Excluir" data-id="${x.id}">🗑️</button>
+            <label><input type="checkbox" class="chkPaid" data-id="${x.id}" ${isPaid(x) ? 'checked' : ''}></label>
+          </div>
+        </div>`;
+      }
     }
     h += '</section>';
   }
@@ -306,6 +326,11 @@ function attachEvents(){
   document.querySelectorAll('.btnRemoveItem').forEach(b => b.onclick = e => removeItem(e.currentTarget.dataset.id));
   document.querySelectorAll('.chkPaid').forEach(c => c.onchange = e => setPaid(find(e.target.dataset.id), e.target.checked));
   document.querySelectorAll('.valuebtn').forEach(b => b.onclick = e => openValue(e.target.dataset.id));
+  document.querySelectorAll('.btnToggleGroup').forEach(b => b.onclick = e => {
+    const g = e.currentTarget.dataset.group;
+    collapsedGroups[g] = !collapsedGroups[g];
+    renderMonth();
+  });
   const pdfBtn = document.getElementById('btnPdf'); if(pdfBtn) pdfBtn.onclick = pdf;
 }
 
@@ -437,12 +462,13 @@ function setTab(activeTab){
   activeTab.classList.add('active');
 }
 
-// 🧾 Gerador de PDF Completo da Página
+// 🧾 Gerador de PDF Completo da Página (Atualizado com o novo grupo AP)
 function pdf(){
   const t = totals();
   const currentMonthName = months[cursor.getMonth()] + ' / ' + cursor.getFullYear();
   const groups = [
     ['income', 'Receitas', '#18864b'],
+    ['ap', 'Gerenciador AP', '#e65100'],
     ['bills', 'Contas', '#1565c0'],
     ['cards', 'Cartões', '#673ab7'],
     ['payable', 'Empréstimos a pagar', '#d63838']
