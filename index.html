@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1565c0">
+<title>Controle Financeiro</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f4f6f8;color:#20252b}
+button,input,select{font:inherit}
+button{cursor:pointer}
+.app{max-width:1050px;margin:auto;padding:14px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+h1{margin:0;font-size:25px}
+.sub{color:#69737d;font-size:13px;margin-top:3px}
+.monthnav{display:flex;align-items:center;gap:5px}
+.monthnav button{border:0;background:white;border-radius:10px;width:38px;height:38px;font-size:24px}
+.monthnav strong{min-width:130px;text-align:center}
+.nav{display:flex;gap:8px;margin-bottom:12px}
+.nav button{flex:1;border:0;background:white;padding:11px;border-radius:10px;font-weight:700}
+.nav button.active{background:#1565c0;color:#fff}
+.summary{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px}
+.card{background:#fff;border-radius:12px;padding:11px;box-shadow:0 1px 4px #00000012}
+.card small{color:#6b737c}
+.money{font-weight:800;font-size:18px;margin-top:5px}
+.green{color:#18864b}
+.red{color:#d63838}
+.section{background:#fff;border-radius:13px;margin:10px 0;overflow:hidden;box-shadow:0 1px 4px #00000012}
+.sectionhead{display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid #edf0f2}
+.sectionhead h2{font-size:17px;margin:0;flex:1}
+.sectionhead .total{font-weight:800}
+.sectionhead button{border:0;background:transparent;font-size:20px}
+.item{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:8px;padding:11px 12px;border-bottom:1px solid #f0f2f4}
+.item:last-child{border-bottom:0}
+.name{font-weight:700}
+.desc{font-size:12px;color:#7b838c;margin-top:3px}
+.paid .name,.paid .desc,.paid .valuebtn{text-decoration:line-through;opacity:.55}
+.status{font-size:12px;color:#68717b}
+.controls{display:flex;align-items:center;gap:4px}
+.icon{border:0;background:transparent;padding:6px;border-radius:7px}
+.icon:hover{background:#eef2f5}
+.valuebtn{border:0;background:transparent;font-weight:800}
+.bottom{background:#fff;border-radius:13px;padding:14px;margin-top:12px}
+.bottomgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.bottomgrid b{display:block;margin-top:4px}
+.fabrow{display:flex;justify-content:flex-end;margin:12px 0;gap:8px}
+.primary{border:0;background:#1565c0;color:#fff;padding:10px 15px;border-radius:10px;font-weight:700}
+.secondary{border:0;background:#e9eef3;padding:10px 15px;border-radius:10px;font-weight:700}
+.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:16px;z-index:5}
+.modal.show{display:flex}
+.box{background:#fff;border-radius:15px;padding:18px;width:min(500px,100%);max-height:92vh;overflow:auto}
+.box h2{margin-top:0}
+.field{margin:10px 0}
+.field label{display:block;font-size:13px;font-weight:700;margin-bottom:5px}
+.field input,.field select{width:100%;padding:10px;border:1px solid #ccd3da;border-radius:9px}
+.actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.reporttable{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden}
+.reporttable th,.reporttable td{padding:9px;border-bottom:1px solid #edf0f2;text-align:right}
+.reporttable th:first-child,.reporttable td:first-child{text-align:left}
+.empty{padding:15px;color:#77808a;font-size:13px}
+.loan-card{background:#fff;border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 1px 4px #00000012;display:flex;justify-content:space-between;align-items:center}
+.loan-info h3{margin:0 0 4px 0;font-size:16px}
+.loan-info p{margin:2px 0;font-size:13px;color:#6d7580}
+.loan-actions{display:flex;gap:6px;align-items:center}
+.loading-bar{background:#e0e0e0;height:3px;width:100%;position:fixed;top:0;left:0;z-index:10;display:none}
+.loading-bar.active{display:block;animation:loading 1s infinite alternate}
+@keyframes loading { from { opacity:0.3 } to { opacity:1 } }
+@media(max-width:760px){
+ .app{padding:10px}
+ .summary{grid-template-columns:repeat(2,1fr)}
+ .summary .card:last-child{grid-column:span 2}
+ .item{grid-template-columns:minmax(0,1fr) auto;gap:8px}
+ .controls{grid-column:2;justify-content:flex-end}
+ .status{grid-column:1}
+ .bottomgrid{grid-template-columns:1fr}
+ .monthnav strong{min-width:110px;font-size:14px}
+ h1{font-size:21px}
+}
+</style>
+</head>
+<body>
+<div id="loading" class="loading-bar"></div>
+<div class="app">
+<header>
+ <div><h1>Controle Financeiro</h1><div class="sub">Sincronizado na Nuvem ☁️</div></div>
+ <div class="monthnav"><button id="prev">‹</button><strong id="monthLabel"></strong><button id="next">›</button></div>
+</header>
+<div class="nav">
+ <button id="tabMonth" class="active">📅 Mês</button>
+ <button id="tabLoans">💰 Empréstimos</button>
+ <button id="tabReports">📊 Relatórios</button>
+</div>
+<main id="main"><div class="empty">Carregando dados da nuvem...</div></main>
+</div>
+
+<!-- Modal para Itens Mensais -->
+<div id="modal" class="modal"><div class="box"><h2 id="modalTitle">Novo item</h2><form id="form">
+<div class="field"><label>Nome</label><input id="fName" required></div>
+<div class="field"><label>Descrição</label><input id="fDesc"></div>
+<div class="field"><label>Valor</label><input id="fValue" type="number" min="0" step=".01" required></div>
+<div class="field"><label>Recorrente?</label><select id="fRecurring"><option value="0">Não</option><option value="1">Sim</option></select></div>
+<div class="field"><label>Meses (ex.: 10,11,12)</label><input id="fMonths" placeholder="vazio = mês do cadastro / todos se recorrente"></div>
+<div class="actions"><button type="button" class="secondary" id="cancel">Cancelar</button><button class="primary">Salvar</button></div>
+</form></div></div>
+
+<!-- Modal para Empréstimos -->
+<div id="loanModal" class="modal"><div class="box"><h2 id="loanModalTitle">Novo Empréstimo</h2><form id="loanForm">
+<div class="field"><label>Nome / Identificação</label><input id="lName" placeholder="Ex: Empréstimo Banco X" required></div>
+<div class="field"><label>Tipo</label>
+ <select id="lType">
+  <option value="payable">Peguei Emprestado (A pagar)</option>
+  <option value="income">Emprestei (A receber)</option>
+ </select>
+</div>
+<div class="field"><label>Valor por Parcela (R$)</label><input id="lInstallmentValue" type="number" min="0.01" step=".01" required></div>
+<div class="field"><label>Número de Parcelas</label><input id="lTotalInstallments" type="number" min="1" max="360" value="12" required></div>
+<div class="field"><label>Mês Inicial (Ano e Mês)</label><input id="lStartMonth" type="month" required></div>
+<div class="actions"><button type="button" class="secondary" id="loanCancel">Cancelar</button><button class="primary">Salvar</button></div>
+</form></div></div>
+
+<!-- Modal Alterar Valor -->
+<div id="valueModal" class="modal"><div class="box"><h2>Alterar valor</h2><div class="sub" id="valueContext"></div>
+<div class="field"><label>Novo valor</label><input id="newValue" type="number" min="0" step=".01"></div>
+<div class="actions"><button class="secondary" id="valueCancel">Cancelar</button><button class="secondary" id="onlyMonth">Somente este mês</button><button class="primary" id="forward">Este mês e próximos</button></div></div></div>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+// ⚠️ SUBSTITUA PELAS SUAS CHAVES DO FIREBASE AQUI:
+const firebaseConfig = {
+  apiKey: "AIzaSyDDf0eXdNJ0G-yw-uSvb8WXbEBPpIANnoo",
+  authDomain: "meu-controle-financeiro-af5ef.firebaseapp.com",
+  projectId: "meu-controle-financeiro-af5ef",
+  storageBucket: "meu-controle-financeiro-af5ef.firebasestorage.app",
+  messagingSenderId: "663422499675",
+  appId: "1:663422499675:web:7c32308ae95f5bbaff387e"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const docRef = doc(db, "financeiro", "dados_usuario");
+
+const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+let state = { items: [], loans: [] };
+let cursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let page = 'month', editId = null, editLoanId = null, valueId = null, currentGroup = 'bills';
+
+function showLoading(show){ document.getElementById('loading').classList.toggle('active', show); }
+
+// Sincronização em Tempo Real via Firebase
+onSnapshot(docRef, (docSnap) => {
+  if (docSnap.exists()) {
+    state = docSnap.data();
+    if (!state.items) state.items = [];
+    if (!state.loans) state.loans = [];
+  } else {
+    state = seed();
+    save();
+  }
+  render();
+});
+
+function save(){
+  showLoading(true);
+  setDoc(docRef, state).then(() => showLoading(false));
+}
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function key(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+function money(v){ return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+
+function seed(){
+  const k = key(new Date());
+  return {
+    items: [
+      { id: uid(), group: 'income', name: 'Salário', desc: 'Salário mensal', value: 3000, recurring: true, months: '', start: k, deletedFrom: null, overrides: {}, paid: {} },
+      { id: uid(), group: 'bills', name: 'Condomínio', desc: 'Condomínio apartamento', value: 650, recurring: true, months: '', start: k, deletedFrom: null, overrides: {}, paid: {} }
+    ],
+    loans: []
+  };
+}
+
+function active(x){
+  const k = key(cursor);
+  if (k < x.start) return false;
+  if (x.deletedFrom && k >= x.deletedFrom) return false;
+  const m = cursor.getMonth() + 1;
+  const list = x.months ? x.months.split(',').map(v => parseInt(v.trim())).filter(Boolean) : [];
+  if (x.recurring) return !list.length || list.includes(m);
+  return list.length ? list.includes(m) : k === x.start;
+}
+
+function items(g){ return state.items.filter(x => x.group === g && active(x)); }
+function val(x){ const k = key(cursor); return Object.prototype.hasOwnProperty.call(x.overrides || {}, k) ? x.overrides[k] : x.value; }
+function isPaid(x){ return x.paid && x.paid[key(cursor)] === true; }
+function setPaid(x, v){ if (!x.paid) x.paid = {}; x.paid[key(cursor)] = v; save(); }
+
+function totals(){
+  const inc = items('income').reduce((a, x) => a + val(x), 0);
+  const expItems = state.items.filter(x => active(x) && x.group !== 'income');
+  const exp = expItems.reduce((a, x) => a + val(x), 0);
+  const paid = expItems.filter(x => isPaid(x)).reduce((a, x) => a + val(x), 0);
+  const pending = exp - paid;
+  const result = inc - exp;
+  return { inc, exp, paid, pending, result };
+}
+
+function render(){
+  document.getElementById('monthLabel').textContent = months[cursor.getMonth()] + ' ' + cursor.getFullYear();
+  document.getElementById('prev').style.display = page === 'month' ? 'block' : 'none';
+  document.getElementById('next').style.display = page === 'month' ? 'block' : 'none';
+  if (page === 'month') renderMonth();
+  else if (page === 'loans') renderLoans();
+  else renderReports();
+}
+
+function renderMonth(){
+  const t = totals(), groups = [['income', 'Receitas', 'green'], ['bills', 'Contas', '#1565c0'], ['cards', 'Cartões', '#673ab7'], ['payable', 'Empréstimos a pagar', 'red']];
+  let h = '<section class="summary">';
+  [['Receitas', t.inc, 'green'], ['Despesas', t.exp, 'red'], ['Total Pago', t.paid, 'green'], ['Total a Pagar', t.pending, 'red'], ['Resultado Previsto', t.result, t.result >= 0 ? 'green' : 'red']]
+  .forEach(c => h += `<div class="card"><small>${c[0]}</small><div class="money ${c[2]}">${money(c[1])}</div></div>`);
+  
+  h += '</section><div class="fabrow"><button class="secondary" id="btnPdf">🧾 Gerar PDF</button></div>';
+  
+  for (const [g, title, color] of groups){
+    const arr = items(g), total = arr.reduce((a, x) => a + val(x), 0);
+    h += `<section class="section"><div class="sectionhead"><h2 style="color:${color}">${title}</h2><span class="total" style="color:${color}">${money(total)}</span><button data-group="${g}" class="btnOpenForm">＋</button></div>`;
+    if (!arr.length) h += '<div class="empty">Nenhum item neste mês.</div>';
+    for (const x of arr){
+      h += `<div class="item ${isPaid(x) ? 'paid' : ''}">
+        <div><div class="name">${esc(x.name)}</div><div class="desc">${esc(x.desc)}</div></div>
+        <span class="status">${isPaid(x) ? 'Pago' : 'A pagar'}</span>
+        <button class="valuebtn" data-id="${x.id}">${money(val(x))}</button>
+        <div class="controls">
+          <button class="icon btnEditItem" title="Editar" data-group="${g}" data-id="${x.id}">✏️</button>
+          <button class="icon btnRemoveItem" title="Excluir" data-id="${x.id}">🗑️</button>
+          <label><input type="checkbox" class="chkPaid" data-id="${x.id}" ${isPaid(x) ? 'checked' : ''}></label>
+        </div>
+      </div>`;
+    }
+    h += '</section>';
+  }
+  h += `<section class="bottom"><b>Fechamento do mês</b><div class="bottomgrid"><div>Pago<b class="green">${money(t.paid)}</b></div><div>A pagar<b class="red">${money(t.pending)}</b></div><div>Resultado<b class="${t.result >= 0 ? 'green' : 'red'}">${money(t.result)}</b></div></div></section>`;
+  main.innerHTML = h;
+  attachEvents();
+}
+
+function renderLoans(){
+  let h = `<section class="bottom">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+      <h2>💰 Gerenciamento de Empréstimos</h2>
+      <button class="primary" id="btnNewLoan">+ Novo empréstimo</button>
+    </div>`;
+  
+  if (!state.loans || state.loans.length === 0){
+    h += '<div class="empty">Nenhum empréstimo cadastrado.</div>';
+  } else {
+    for (const loan of state.loans){
+      const totalAmount = loan.installmentValue * loan.totalInstallments;
+      const typeLabel = loan.type === 'payable' ? 'Peguei Emprestado' : 'Emprestei';
+      const color = loan.type === 'payable' ? 'red' : 'green';
+      
+      h += `<div class="loan-card">
+        <div class="loan-info">
+          <h3>${esc(loan.name)}</h3>
+          <p><b>Tipo:</b> <span class="${color}">${typeLabel}</span></p>
+          <p><b>Valor da Parcela:</b> ${money(loan.installmentValue)} (${loan.totalInstallments}x)</p>
+          <p><b>Total do Empréstimo:</b> ${money(totalAmount)}</p>
+          <p><b>Mês de Início:</b> ${loan.startMonth}</p>
+        </div>
+        <div class="loan-actions">
+          <button class="icon btnEditLoan" title="Editar" data-id="${loan.id}">✏️</button>
+          <button class="icon btnDeleteLoan" title="Excluir" data-id="${loan.id}">🗑️</button>
+        </div>
+      </div>`;
+    }
+  }
+  h += '</section>';
+  main.innerHTML = h;
+  attachLoanEvents();
+}
+
+function renderReports(){
+  const t = totals();
+  main.innerHTML = `<section class="bottom"><h2>📊 Relatório</h2><p>${months[cursor.getMonth()]} ${cursor.getFullYear()}</p><table class="reporttable"><tr><th>Indicador</th><th>Valor</th></tr><tr><td>Receitas</td><td>${money(t.inc)}</td></tr><tr><td>Despesas</td><td>${money(t.exp)}</td></tr><tr><td>Total Pago</td><td>${money(t.paid)}</td></tr><tr><td>Total a Pagar</td><td>${money(t.pending)}</td></tr><tr><td>Resultado Previsto</td><td>${money(t.result)}</td></tr></table></section>`;
+}
+
+function find(id){ return state.items.find(x => x.id === id); }
+function esc(s){ return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+function openForm(g, id = null){
+  currentGroup = g; editId = id;
+  const x = id ? find(id) : null;
+  modalTitle.textContent = x ? 'Editar item' : 'Novo item';
+  fName.value = x?.name || ''; fDesc.value = x?.desc || '';
+  fValue.value = x?.value ?? ''; fRecurring.value = x?.recurring ? 1 : 0;
+  fMonths.value = x?.months || ''; modal.classList.add('show');
+}
+
+function attachEvents(){
+  document.querySelectorAll('.btnOpenForm').forEach(b => b.onclick = e => openForm(e.target.dataset.group));
+  document.querySelectorAll('.btnEditItem').forEach(b => b.onclick = e => openForm(e.currentTarget.dataset.group, e.currentTarget.dataset.id));
+  document.querySelectorAll('.btnRemoveItem').forEach(b => b.onclick = e => removeItem(e.currentTarget.dataset.id));
+  document.querySelectorAll('.chkPaid').forEach(c => c.onchange = e => setPaid(find(e.target.dataset.id), e.target.checked));
+  document.querySelectorAll('.valuebtn').forEach(b => b.onclick = e => openValue(e.target.dataset.id));
+  const pdfBtn = document.getElementById('btnPdf'); if(pdfBtn) pdfBtn.onclick = pdf;
+}
+
+function attachLoanEvents(){
+  const newLoan = document.getElementById('btnNewLoan'); if(newLoan) newLoan.onclick = () => openLoanForm();
+  document.querySelectorAll('.btnEditLoan').forEach(b => b.onclick = e => openLoanForm(e.currentTarget.dataset.id));
+  document.querySelectorAll('.btnDeleteLoan').forEach(b => b.onclick = e => deleteLoan(e.currentTarget.dataset.id));
+}
+
+cancel.onclick = () => modal.classList.remove('show');
+
+form.onsubmit = e => {
+  e.preventDefault();
+  const v = Number(fValue.value);
+  if (!fName.value.trim() || !Number.isFinite(v)) return;
+  if (editId){
+    let x = find(editId);
+    x.name = fName.value.trim(); x.desc = fDesc.value.trim(); x.value = v;
+    x.recurring = fRecurring.value === '1'; x.months = fMonths.value.trim();
+  } else {
+    state.items.push({
+      id: uid(), group: currentGroup || 'bills', name: fName.value.trim(), desc: fDesc.value.trim(),
+      value: v, recurring: fRecurring.value === '1', months: fMonths.value.trim(),
+      start: key(cursor), deletedFrom: null, overrides: {}, paid: {}
+    });
+  }
+  save(); modal.classList.remove('show');
+};
+
+function openLoanForm(loanId = null){
+  editLoanId = loanId;
+  const loan = loanId ? state.loans.find(l => l.id === loanId) : null;
+  document.getElementById('loanModalTitle').textContent = loan ? 'Editar Empréstimo' : 'Novo Empréstimo';
+  document.getElementById('lName').value = loan?.name || '';
+  document.getElementById('lType').value = loan?.type || 'payable';
+  document.getElementById('lInstallmentValue').value = loan?.installmentValue || '';
+  document.getElementById('lTotalInstallments').value = loan?.totalInstallments || 12;
+  document.getElementById('lStartMonth').value = loan?.startMonth || key(cursor);
+  document.getElementById('loanModal').classList.add('show');
+}
+
+document.getElementById('loanCancel').onclick = () => document.getElementById('loanModal').classList.remove('show');
+
+document.getElementById('loanForm').onsubmit = e => {
+  e.preventDefault();
+  const name = document.getElementById('lName').value.trim();
+  const type = document.getElementById('lType').value;
+  const instValue = Number(document.getElementById('lInstallmentValue').value);
+  const totalInst = parseInt(document.getElementById('lTotalInstallments').value);
+  const startMonth = document.getElementById('lStartMonth').value;
+
+  if (editLoanId){
+    deleteLoanItems(editLoanId);
+    const idx = state.loans.findIndex(l => l.id === editLoanId);
+    if (idx !== -1) state.loans[idx] = { id: editLoanId, name, type, installmentValue: instValue, totalInstallments: totalInst, startMonth };
+    generateLoanItems(state.loans[idx]);
+  } else {
+    const newLoan = { id: uid(), name, type, installmentValue: instValue, totalInstallments: totalInst, startMonth };
+    state.loans.push(newLoan);
+    generateLoanItems(newLoan);
+  }
+  save(); document.getElementById('loanModal').classList.remove('show');
+};
+
+function generateLoanItems(loan){
+  const [startYear, startMonthNum] = loan.startMonth.split('-').map(Number);
+  for (let i = 0; i < loan.totalInstallments; i++){
+    const d = new Date(startYear, startMonthNum - 1 + i, 1);
+    state.items.push({
+      id: uid(), loanId: loan.id, group: loan.type,
+      name: `${loan.name} (${i + 1}/${loan.totalInstallments})`,
+      desc: `Parcela de empréstimo`, value: loan.installmentValue,
+      recurring: false, months: '', start: key(d), deletedFrom: null, overrides: {}, paid: {}
+    });
+  }
+}
+
+function deleteLoanItems(loanId){ state.items = state.items.filter(item => item.loanId !== loanId); }
+function deleteLoan(loanId){
+  if (confirm('Excluir este empréstimo e todas as parcelas?')){
+    deleteLoanItems(loanId);
+    state.loans = state.loans.filter(l => l.id !== loanId);
+    save();
+  }
+}
+
+function removeItem(id){
+  const x = find(id);
+  if (x && confirm('Excluir a partir deste mês?')){
+    x.deletedFrom = key(cursor);
+    save();
+  }
+}
+
+function openValue(id){
+  valueId = id; const x = find(id);
+  valueContext.textContent = x.name + ' • ' + months[cursor.getMonth()] + ' ' + cursor.getFullYear();
+  newValue.value = val(x); valueModal.classList.add('show');
+}
+
+valueCancel.onclick = () => valueModal.classList.remove('show');
+
+function applyValue(forward){
+  const x = find(valueId), v = Number(newValue.value);
+  if (!x || !Number.isFinite(v)) return;
+  const k = key(cursor);
+  if (forward) {
+    x.value = v;
+    if (x.overrides) Object.keys(x.overrides).forEach(m => { if (m >= k) delete x.overrides[m]; });
+  } else {
+    if (!x.overrides) x.overrides = {};
+    x.overrides[k] = v;
+  }
+  save(); valueModal.classList.remove('show');
+}
+
+onlyMonth.onclick = () => applyValue(false);
+forward.onclick = () => applyValue(true);
+
+prev.onclick = () => { cursor = new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1); render(); };
+next.onclick = () => { cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1); render(); };
+
+tabMonth.onclick = () => { page = 'month'; setTab(tabMonth); render(); };
+tabLoans.onclick = () => { page = 'loans'; setTab(tabLoans); render(); };
+tabReports.onclick = () => { page = 'reports'; setTab(tabReports); render(); };
+
+function setTab(activeTab){
+  [tabMonth, tabLoans, tabReports].forEach(btn => btn.classList.remove('active'));
+  activeTab.classList.add('active');
+}
+
+function pdf(){
+  const t = totals(), rows = [];
+  [['income', 'Receitas'], ['bills', 'Contas'], ['cards', 'Cartões'], ['payable', 'Empréstimos a pagar']].forEach(([g, n]) => {
+    items(g).forEach(x => rows.push(`<tr><td>${esc(n)}</td><td>${esc(x.name)}</td><td>${money(val(x))}</td><td>${isPaid(x) ? 'Pago' : 'A pagar'}</td></tr>`));
+  });
+  const w = window.open('', '_blank');
+  if (!w) return;
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Contas - ${months[cursor.getMonth()]} ${cursor.getFullYear()}</title><style>body{font-family:Arial;padding:20px}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #ddd;text-align:left}</style></head><body><h1>CONTROLE FINANCEIRO</h1><h2>${months[cursor.getMonth()]} ${cursor.getFullYear()}</h2><table><tr><th>Grupo</th><th>Item</th><th>Valor</th><th>Status</th></tr>${rows.join('')}</table><script>window.onload=()=>window.print()<\/script></body></html>`);
+  w.document.close();
+}
+</script>
+</body>
+</html>
