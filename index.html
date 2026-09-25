@@ -83,49 +83,9 @@ h1{margin:0;font-size:25px}
  .fabrow{justify-content:stretch}
  .fabrow button{flex:1;font-size:12px;padding:8px 10px}
 }
-
-/* ===== LOGIN ===== */
-.login-overlay{
-  position:fixed;inset:0;background:rgba(15,23,42,.92);
-  display:flex;align-items:center;justify-content:center;
-  padding:16px;z-index:1000;
-}
-.login-overlay.hidden{display:none!important}
-.login-card{
-  width:min(400px,100%);background:#fff;border-radius:16px;
-  padding:24px;box-shadow:0 12px 40px #00000040;
-}
-.login-card h2{margin:0 0 8px}
-.login-card p{margin:0 0 18px;color:#69737d;font-size:13px}
-.login-field{margin:12px 0}
-.login-field label{display:block;font-size:13px;font-weight:700;margin-bottom:5px}
-.login-field input{width:100%;padding:11px;border:1px solid #ccd3da;border-radius:9px}
-.login-error{color:#d63838;font-size:13px;min-height:18px;margin-top:10px}
-
 </style>
 </head>
 <body>
-
-<!-- ================= LOGIN ================= -->
-<div id="loginOverlay" class="login-overlay hidden">
-  <div class="login-card">
-    <h2>🔐 Controle Financeiro</h2>
-    <p>Primeiro acesso: informe seu e-mail e sua senha.</p>
-    <form id="loginForm">
-      <div class="login-field">
-        <label for="loginEmail">E-mail</label>
-        <input id="loginEmail" type="email" autocomplete="username" required>
-      </div>
-      <div class="login-field">
-        <label for="loginPassword">Senha</label>
-        <input id="loginPassword" type="password" autocomplete="current-password" required>
-      </div>
-      <button class="primary" type="submit" style="width:100%">Entrar</button>
-      <div id="loginError" class="login-error"></div>
-    </form>
-  </div>
-</div>
-
 <div id="loading" class="loading-bar"></div>
 <div class="app">
 <header>
@@ -191,7 +151,6 @@ h1{margin:0;font-size:25px}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // ⚠️ SUBSTITUA PELAS SUAS CHAVES DO FIREBASE AQUI:
 const firebaseConfig = {
@@ -205,7 +164,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app);
 const docRef = doc(db, "financeiro", "dados_usuario");
 
 const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -226,68 +184,16 @@ function savePreferences(){
 
 function showLoading(show){ document.getElementById('loading').classList.toggle('active', show); }
 
-const loginOverlay = document.getElementById('loginOverlay');
-const loginForm = document.getElementById('loginForm');
-const loginError = document.getElementById('loginError');
-const appRoot = document.querySelector('.app');
-let unsubscribeData = null;
-
-function hideApp(){
-  appRoot.style.display = 'none';
-}
-
-function showLogin(){
-  hideApp();
-  loginOverlay.classList.remove('hidden');
-}
-
-function startApp(){
-  loginOverlay.classList.add('hidden');
-  appRoot.style.display = '';
-  if (unsubscribeData) unsubscribeData();
-
-  unsubscribeData = onSnapshot(docRef, (docSnap) => {
-    if (docSnap.exists()) {
-      state = docSnap.data();
-      if (!state.items) state.items = [];
-      if (!state.loans) state.loans = [];
-    } else {
-      state = { items: [], loans: [] };
-      save();
-    }
-    render();
-  }, (error) => {
-    console.error('Erro ao ler dados:', error);
-    alert('Não foi possível carregar os dados: ' + error.message);
-  });
-}
-
-/*
-  O Firebase Authentication mantém a sessão neste navegador.
-  Portanto:
-  - primeiro acesso: pede e-mail e senha;
-  - próximos acessos: não pede novamente;
-  - não existe PIN;
-  - não existe botão Bloquear.
-*/
-onAuthStateChanged(auth, (user) => {
-  if (user) startApp();
-  else showLogin();
-});
-
-loginForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  loginError.textContent = '';
-
-  const email = document.getElementById('loginEmail').value.trim();
-  const password = document.getElementById('loginPassword').value;
-
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-  } catch (error) {
-    console.error(error);
-    loginError.textContent = 'E-mail ou senha incorretos.';
+onSnapshot(docRef, (docSnap) => {
+  if (docSnap.exists()) {
+    state = docSnap.data();
+    if (!state.items) state.items = [];
+    if (!state.loans) state.loans = [];
+  } else {
+    state = { items: [], loans: [] };
+    save();
   }
+  render();
 });
 
 function save(){
