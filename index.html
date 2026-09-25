@@ -83,17 +83,53 @@ h1{margin:0;font-size:25px}
  .fabrow{justify-content:stretch}
  .fabrow button{flex:1;font-size:12px;padding:8px 10px}
 }
-/* ===== AUTENTICAÇÃO ===== */
-.auth-overlay{position:fixed;inset:0;background:rgba(15,23,42,.92);display:flex;align-items:center;justify-content:center;padding:16px;z-index:1000}.auth-overlay.hidden{display:none!important}.auth-card{width:min(420px,100%);background:#fff;border-radius:16px;padding:24px;box-shadow:0 12px 40px #00000040}.auth-card h2{margin:0 0 8px}.auth-card p{margin:0 0 18px;color:#69737d;font-size:13px;line-height:1.5}.auth-field{margin:12px 0}.auth-field label{display:block;font-size:13px;font-weight:700;margin-bottom:5px}.auth-field input{width:100%;padding:11px;border:1px solid #ccd3da;border-radius:9px}.auth-pin{letter-spacing:8px;text-align:center;font-size:22px}.auth-error{color:#d63838;font-size:13px;min-height:18px;margin-top:10px}.auth-link{display:block;text-align:center;margin-top:14px;color:#1565c0;font-size:12px;text-decoration:none;cursor:pointer}.auth-lock{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#69737d;margin-top:8px}
+
+/* ===== LOGIN ===== */
+.login-overlay{
+  position:fixed;inset:0;background:rgba(15,23,42,.92);
+  display:flex;align-items:center;justify-content:center;
+  padding:16px;z-index:1000;
+}
+.login-overlay.hidden{display:none!important}
+.login-card{
+  width:min(400px,100%);background:#fff;border-radius:16px;
+  padding:24px;box-shadow:0 12px 40px #00000040;
+}
+.login-card h2{margin:0 0 8px}
+.login-card p{margin:0 0 18px;color:#69737d;font-size:13px}
+.login-field{margin:12px 0}
+.login-field label{display:block;font-size:13px;font-weight:700;margin-bottom:5px}
+.login-field input{width:100%;padding:11px;border:1px solid #ccd3da;border-radius:9px}
+.login-error{color:#d63838;font-size:13px;min-height:18px;margin-top:10px}
+
 </style>
 </head>
 <body>
-<div id="authSetup" class="auth-overlay hidden"><div class="auth-card"><h2>🔐 Primeiro acesso</h2><p>Entre com seu e-mail e senha do Firebase e defina um PIN de 6 dígitos para desbloquear este aparelho.</p><form id="authSetupForm"><div class="auth-field"><label for="authEmail">E-mail</label><input id="authEmail" type="email" autocomplete="username" required></div><div class="auth-field"><label for="authPassword">Senha</label><input id="authPassword" type="password" autocomplete="current-password" required></div><div class="auth-field"><label for="authPin">PIN deste aparelho</label><input id="authPin" class="auth-pin" type="password" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="new-password" placeholder="••••••" required></div><button class="primary" type="submit" style="width:100%">Entrar e configurar</button><div id="authSetupError" class="auth-error"></div></form></div></div><div id="authPin" class="auth-overlay hidden"><div class="auth-card"><h2>🔒 Controle Financeiro bloqueado</h2><p>Digite o PIN de 6 dígitos para acessar seus dados.</p><form id="authPinForm"><div class="auth-field"><input id="authPinInput" class="auth-pin" type="password" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="current-password" placeholder="••••••" required></div><button class="primary" type="submit" style="width:100%">Desbloquear</button><div id="authPinError" class="auth-error"></div></form><a id="authReset" class="auth-link">Trocar conta / resetar este aparelho</a></div></div>
+
+<!-- ================= LOGIN ================= -->
+<div id="loginOverlay" class="login-overlay hidden">
+  <div class="login-card">
+    <h2>🔐 Controle Financeiro</h2>
+    <p>Primeiro acesso: informe seu e-mail e sua senha.</p>
+    <form id="loginForm">
+      <div class="login-field">
+        <label for="loginEmail">E-mail</label>
+        <input id="loginEmail" type="email" autocomplete="username" required>
+      </div>
+      <div class="login-field">
+        <label for="loginPassword">Senha</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" required>
+      </div>
+      <button class="primary" type="submit" style="width:100%">Entrar</button>
+      <div id="loginError" class="login-error"></div>
+    </form>
+  </div>
+</div>
 
 <div id="loading" class="loading-bar"></div>
 <div class="app">
 <header>
- <div><h1>Controle Financeiro</h1><div class="sub">Sincronizado na Nuvem ☁️ <span class="auth-lock">🔒 Protegido</span></div></div><button id="btnLock" class="secondary" style="padding:8px 12px">🔒 Bloquear</button>
+ <div><h1>Controle Financeiro</h1><div class="sub">Sincronizado na Nuvem ☁️</div></div>
  <div class="monthnav">
    <button id="prev">‹</button>
    <strong id="monthLabel" title="Clique para escolher o mês/ano"></strong>
@@ -155,7 +191,7 @@ h1{margin:0;font-size:25px}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // ⚠️ SUBSTITUA PELAS SUAS CHAVES DO FIREBASE AQUI:
 const firebaseConfig = {
@@ -190,62 +226,73 @@ function savePreferences(){
 
 function showLoading(show){ document.getElementById('loading').classList.toggle('active', show); }
 
-let unsubscribeData = null;
-let appUnlocked = false;
-const LOCAL_PIN_KEY = 'cf_auth_pin_v1';
-const authSetup = document.getElementById('authSetup');
-const authPin = document.getElementById('authPin');
+const loginOverlay = document.getElementById('loginOverlay');
+const loginForm = document.getElementById('loginForm');
+const loginError = document.getElementById('loginError');
 const appRoot = document.querySelector('.app');
-const authSetupForm = document.getElementById('authSetupForm');
-const authPinForm = document.getElementById('authPinForm');
-const authSetupError = document.getElementById('authSetupError');
-const authPinError = document.getElementById('authPinError');
-const authReset = document.getElementById('authReset');
-const btnLock = document.getElementById('btnLock');
+let unsubscribeData = null;
 
-function stopDataListener(){ if (unsubscribeData) { unsubscribeData(); unsubscribeData = null; } }
-function hideApp(){ appUnlocked = false; stopDataListener(); appRoot.style.display = 'none'; }
-function showSetup(){ hideApp(); authPin.classList.add('hidden'); authSetup.classList.remove('hidden'); authSetupError.textContent = ''; }
-function showPin(){ hideApp(); authSetup.classList.add('hidden'); authPin.classList.remove('hidden'); authPinError.textContent = ''; document.getElementById('authPinInput').value = ''; setTimeout(() => document.getElementById('authPinInput').focus(), 50); }
-function startApp(){
-  appUnlocked = true; authSetup.classList.add('hidden'); authPin.classList.add('hidden'); appRoot.style.display = ''; authPinError.textContent = '';
-  stopDataListener();
-  unsubscribeData = onSnapshot(docRef, (docSnap) => {
-    if (docSnap.exists()) { state = docSnap.data(); if (!state.items) state.items = []; if (!state.loans) state.loans = []; }
-    else { state = { items: [], loans: [] }; save(); }
-    render();
-  }, (error) => { console.error('Erro ao ler dados:', error); alert('Não foi possível carregar os dados. Verifique a autenticação e as regras do Firestore.'); });
+function hideApp(){
+  appRoot.style.display = 'none';
 }
 
+function showLogin(){
+  hideApp();
+  loginOverlay.classList.remove('hidden');
+}
+
+function startApp(){
+  loginOverlay.classList.add('hidden');
+  appRoot.style.display = '';
+  if (unsubscribeData) unsubscribeData();
+
+  unsubscribeData = onSnapshot(docRef, (docSnap) => {
+    if (docSnap.exists()) {
+      state = docSnap.data();
+      if (!state.items) state.items = [];
+      if (!state.loans) state.loans = [];
+    } else {
+      state = { items: [], loans: [] };
+      save();
+    }
+    render();
+  }, (error) => {
+    console.error('Erro ao ler dados:', error);
+    alert('Não foi possível carregar os dados: ' + error.message);
+  });
+}
+
+/*
+  O Firebase Authentication mantém a sessão neste navegador.
+  Portanto:
+  - primeiro acesso: pede e-mail e senha;
+  - próximos acessos: não pede novamente;
+  - não existe PIN;
+  - não existe botão Bloquear.
+*/
 onAuthStateChanged(auth, (user) => {
-  const savedPin = localStorage.getItem(LOCAL_PIN_KEY);
-  if (!user) { localStorage.removeItem(LOCAL_PIN_KEY); showSetup(); return; }
-  if (!savedPin) { showSetup(); return; }
-  if (!appUnlocked) showPin();
+  if (user) startApp();
+  else showLogin();
 });
 
-authSetupForm.addEventListener('submit', async (e) => {
-  e.preventDefault(); authSetupError.textContent = '';
-  const email = document.getElementById('authEmail').value.trim();
-  const password = document.getElementById('authPassword').value;
-  const pin = document.getElementById('authPin').value.trim();
-  if (!/^[0-9]{6}$/.test(pin)) { authSetupError.textContent = 'O PIN deve ter exatamente 6 números.'; return; }
-  try { await signInWithEmailAndPassword(auth, email, password); localStorage.setItem(LOCAL_PIN_KEY, pin); startApp(); }
-  catch (error) { console.error(error); authSetupError.textContent = 'Não foi possível entrar. Confira e-mail e senha.'; }
-});
+loginForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  loginError.textContent = '';
 
-authPinForm.addEventListener('submit', (e) => {
-  e.preventDefault(); const input = document.getElementById('authPinInput').value; const saved = localStorage.getItem(LOCAL_PIN_KEY);
-  if (input === saved) startApp();
-  else { authPinError.textContent = 'PIN incorreto.'; document.getElementById('authPinInput').value = ''; document.getElementById('authPinInput').focus(); }
-});
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
 
-btnLock.onclick = () => { if (appUnlocked) showPin(); };
-authReset.onclick = async (e) => { e.preventDefault(); if (!confirm('Isso vai sair da conta e apagar o PIN salvo neste aparelho. Continuar?')) return; localStorage.removeItem(LOCAL_PIN_KEY); appUnlocked = false; stopDataListener(); await signOut(auth); };
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (error) {
+    console.error(error);
+    loginError.textContent = 'E-mail ou senha incorretos.';
+  }
+});
 
 function save(){
   showLoading(true);
-  return setDoc(docRef, state).catch(error => { console.error('Erro ao salvar:', error); alert('Erro ao salvar os dados: ' + error.message); throw error; }).finally(() => showLoading(false));
+  setDoc(docRef, state).then(() => showLoading(false));
 }
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
@@ -610,8 +657,6 @@ function setTab(activeTab){
   activeTab.classList.add('active');
 }
 
-function moneyPdf(v){ return Number(v || 0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
-
 function pdf(){
   const t = totals();
   const currentMonthName = months[cursor.getMonth()] + ' / ' + cursor.getFullYear();
@@ -633,7 +678,7 @@ function pdf(){
       <div style="margin-bottom:20px;">
         <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid ${color};padding-bottom:5px;margin-bottom:8px;">
           <h3 style="margin:0;color:${color};font-size:16px;">${title}</h3>
-          <span style="font-weight:bold;color:${color}">${hideValues ? '••••••' : moneyPdf(total)}</span>
+          <span style="font-weight:bold;color:${color}">${hideValues ? '••••••' : money(total)}</span>
         </div>
         ${arr.length === 0 ? '<p style="color:#777;font-size:12px;margin:5px 0;">Nenhum item cadastrado neste mês.</p>' : `
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -655,7 +700,7 @@ function pdf(){
                       ${isPaid(x) ? 'PAGO' : 'A PAGAR'}
                     </span>
                   </td>
-                  <td style="padding:6px;border-bottom:1px solid #eee;text-align:right;font-weight:bold;">${hideValues ? '••••••' : moneyPdf(val(x))}</td>
+                  <td style="padding:6px;border-bottom:1px solid #eee;text-align:right;font-weight:bold;">${hideValues ? '••••••' : money(val(x))}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -701,19 +746,19 @@ function pdf(){
       </div>
 
       <div class="summary-box">
-        <div class="summary-card"><small>Receitas</small><div class="green">${hideValues ? '••••••' : moneyPdf(t.inc)}</div></div>
-        <div class="summary-card"><small>Despesas</small><div class="red">${hideValues ? '••••••' : moneyPdf(t.exp)}</div></div>
-        <div class="summary-card"><small>Total Pago</small><div class="green">${hideValues ? '••••••' : moneyPdf(t.paid)}</div></div>
-        <div class="summary-card"><small>Total a Pagar</small><div class="red">${hideValues ? '••••••' : moneyPdf(t.pending)}</div></div>
-        <div class="summary-card"><small>Resultado</small><div class="${t.result >= 0 ? 'green' : 'red'}">${hideValues ? '••••••' : moneyPdf(t.result)}</div></div>
+        <div class="summary-card"><small>Receitas</small><div class="green">${hideValues ? '••••••' : money(t.inc)}</div></div>
+        <div class="summary-card"><small>Despesas</small><div class="red">${hideValues ? '••••••' : money(t.exp)}</div></div>
+        <div class="summary-card"><small>Total Pago</small><div class="green">${hideValues ? '••••••' : money(t.paid)}</div></div>
+        <div class="summary-card"><small>Total a Pagar</small><div class="red">${hideValues ? '••••••' : money(t.pending)}</div></div>
+        <div class="summary-card"><small>Resultado</small><div class="${t.result >= 0 ? 'green' : 'red'}">${hideValues ? '••••••' : money(t.result)}</div></div>
       </div>
 
       ${tablesHtml}
 
       <div class="footer-summary">
-        <span>Total Pago: <span class="green">${hideValues ? '••••••' : moneyPdf(t.paid)}</span></span>
-        <span>A Pagar: <span class="red">${hideValues ? '••••••' : moneyPdf(t.pending)}</span></span>
-        <span>Resultado Previsto: <span class="${t.result >= 0 ? 'green' : 'red'}">${hideValues ? '••••••' : moneyPdf(t.result)}</span></span>
+        <span>Total Pago: <span class="green">${hideValues ? '••••••' : money(t.paid)}</span></span>
+        <span>A Pagar: <span class="red">${hideValues ? '••••••' : money(t.pending)}</span></span>
+        <span>Resultado Previsto: <span class="${t.result >= 0 ? 'green' : 'red'}">${hideValues ? '••••••' : money(t.result)}</span></span>
       </div>
 
       <script>
