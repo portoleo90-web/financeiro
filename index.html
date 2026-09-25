@@ -83,9 +83,36 @@ h1{margin:0;font-size:25px}
  .fabrow{justify-content:stretch}
  .fabrow button{flex:1;font-size:12px;padding:8px 10px}
 }
+
+.auth-overlay{position:fixed;inset:0;background:#f4f6f8;display:flex;align-items:center;justify-content:center;padding:20px;z-index:100}
+.auth-overlay.hidden{display:none}
+.auth-card{background:#fff;width:min(400px,100%);padding:24px;border-radius:16px;box-shadow:0 4px 20px #0002}
+.auth-card h2{margin:0 0 8px}
+.auth-card p{color:#69737d;font-size:13px;line-height:1.45;margin:0 0 18px}
+.auth-error{color:#c62828;font-size:13px;margin-top:10px;min-height:18px}
 </style>
 </head>
 <body>
+
+<div id="loginOverlay" class="auth-overlay hidden">
+  <div class="auth-card">
+    <h2>🔐 Controle Financeiro</h2>
+    <p>Entre com seu e-mail e senha. Depois deste primeiro acesso, o navegador manterá sua sessão.</p>
+    <form id="loginForm">
+      <div class="field">
+        <label for="loginEmail">E-mail</label>
+        <input id="loginEmail" type="email" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="loginPassword">Senha</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" required>
+      </div>
+      <button class="primary" type="submit" style="width:100%">Entrar</button>
+      <div id="loginError" class="auth-error"></div>
+    </form>
+  </div>
+</div>
+
 <div id="loading" class="loading-bar"></div>
 <div class="app">
 <header>
@@ -151,6 +178,7 @@ h1{margin:0;font-size:25px}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // ⚠️ SUBSTITUA PELAS SUAS CHAVES DO FIREBASE AQUI:
 const firebaseConfig = {
@@ -164,6 +192,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 const docRef = doc(db, "financeiro", "dados_usuario");
 
 const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -184,16 +213,66 @@ function savePreferences(){
 
 function showLoading(show){ document.getElementById('loading').classList.toggle('active', show); }
 
-onSnapshot(docRef, (docSnap) => {
-  if (docSnap.exists()) {
-    state = docSnap.data();
-    if (!state.items) state.items = [];
-    if (!state.loans) state.loans = [];
-  } else {
-    state = { items: [], loans: [] };
-    save();
+const loginOverlay = document.getElementById('loginOverlay');
+const loginForm = document.getElementById('loginForm');
+const loginEmail = document.getElementById('loginEmail');
+const loginPassword = document.getElementById('loginPassword');
+const loginError = document.getElementById('loginError');
+const appRoot = document.querySelector('.app');
+let unsubscribeData = null;
+
+function showLogin(){
+  appRoot.style.display = 'none';
+  loginOverlay.classList.remove('hidden');
+}
+
+function startApp(){
+  loginOverlay.classList.add('hidden');
+  appRoot.style.display = '';
+  if (unsubscribeData) unsubscribeData();
+
+  unsubscribeData = onSnapshot(docRef, (docSnap) => {
+    if (docSnap.exists()) {
+      state = docSnap.data();
+      if (!state.items) state.items = [];
+      if (!state.loans) state.loans = [];
+    } else {
+      state = { items: [], loans: [] };
+      save();
+    }
+    render();
+  }, (error) => {
+    console.error(error);
+    alert('Não foi possível acessar seus dados financeiros. Verifique as regras de segurança do Firestore.');
+  });
+}
+
+loginForm.onsubmit = async (e) => {
+  e.preventDefault();
+  loginError.textContent = '';
+  const email = loginEmail.value.trim();
+  const password = loginPassword.value;
+
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (error) {
+    console.error(error);
+    const messages = {
+      'auth/invalid-credential': 'E-mail ou senha incorretos.',
+      'auth/invalid-email': 'E-mail inválido.',
+      'auth/user-disabled': 'Este usuário está desativado.',
+      'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'
+    };
+    loginError.textContent = messages[error.code] || 'Não foi possível entrar. Verifique o e-mail e a senha.';
   }
-  render();
+};
+
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    startApp();
+  } else {
+    showLogin();
+  }
 });
 
 function save(){
