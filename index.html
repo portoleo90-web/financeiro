@@ -16,7 +16,8 @@ h1{margin:0;font-size:25px}
 .sub{color:#69737d;font-size:13px;margin-top:3px}
 .monthnav{display:flex;align-items:center;gap:5px}
 .monthnav button{border:0;background:white;border-radius:10px;width:38px;height:38px;font-size:24px}
-.monthnav strong{min-width:130px;text-align:center}
+.monthnav strong{min-width:130px;text-align:center;cursor:pointer;padding:6px 10px;border-radius:8px;transition:background 0.2s}
+.monthnav strong:hover{background:#e3edfa;color:#1565c0}
 .nav{display:flex;gap:8px;margin-bottom:12px}
 .nav button{flex:1;border:0;background:white;padding:11px;border-radius:10px;font-weight:700}
 .nav button.active{background:#1565c0;color:#fff}
@@ -44,7 +45,10 @@ h1{margin:0;font-size:25px}
 .bottom{background:#fff;border-radius:13px;padding:14px;margin-top:12px}
 .bottomgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .bottomgrid b{display:block;margin-top:4px}
-.fabrow{display:flex;justify-content:flex-end;margin:12px 0;gap:8px}
+.progress-container{margin-top:15px;padding-top:15px;border-top:1px solid #edf0f2}
+.progress-bar-bg{background:#e0e6ed;height:12px;border-radius:6px;overflow:hidden;margin-top:6px}
+.progress-bar-fill{height:100%;transition:width 0.3s ease, background-color 0.3s ease}
+.fabrow{display:flex;justify-content:flex-end;margin:12px 0;gap:8px;flex-wrap:wrap}
 .primary{border:0;background:#1565c0;color:#fff;padding:10px 15px;border-radius:10px;font-weight:700}
 .secondary{border:0;background:#e9eef3;padding:10px 15px;border-radius:10px;font-weight:700}
 .modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:16px;z-index:5}
@@ -76,6 +80,8 @@ h1{margin:0;font-size:25px}
  .bottomgrid{grid-template-columns:1fr}
  .monthnav strong{min-width:110px;font-size:14px}
  h1{font-size:21px}
+ .fabrow{justify-content:stretch}
+ .fabrow button{flex:1;font-size:12px;padding:8px 10px}
 }
 </style>
 </head>
@@ -84,7 +90,11 @@ h1{margin:0;font-size:25px}
 <div class="app">
 <header>
  <div><h1>Controle Financeiro</h1><div class="sub">Sincronizado na Nuvem ☁️</div></div>
- <div class="monthnav"><button id="prev">‹</button><strong id="monthLabel"></strong><button id="next">›</button></div>
+ <div class="monthnav">
+   <button id="prev">‹</button>
+   <strong id="monthLabel" title="Clique para escolher o mês/ano"></strong>
+   <button id="next">›</button>
+ </div>
 </header>
 <div class="nav">
  <button id="tabMonth" class="active">📅 Mês</button>
@@ -93,6 +103,19 @@ h1{margin:0;font-size:25px}
 </div>
 <main id="main"><div class="empty">Carregando dados da nuvem...</div></main>
 </div>
+
+<!-- Modal para Seleção Rápida de Mês/Ano -->
+<div id="datePickerModal" class="modal"><div class="box"><h2>Selecionar Mês e Ano</h2>
+<div class="field"><label>Mês</label>
+<select id="selectMonth">
+  <option value="0">Janeiro</option><option value="1">Fevereiro</option><option value="2">Março</option>
+  <option value="3">Abril</option><option value="4">Maio</option><option value="5">Junho</option>
+  <option value="6">Julho</option><option value="7">Agosto</option><option value="8">Setembro</option>
+  <option value="9">Outubro</option><option value="10">Novembro</option><option value="11">Dezembro</option>
+</select></div>
+<div class="field"><label>Ano</label><input id="selectYear" type="number" min="2020" max="2050"></div>
+<div class="actions"><button class="secondary" id="datePickerCancel">Cancelar</button><button class="primary" id="datePickerApply">Ir para a Data</button></div>
+</div></div>
 
 <!-- Modal para Itens Mensais -->
 <div id="modal" class="modal"><div class="box"><h2 id="modalTitle">Novo item</h2><form id="form">
@@ -147,8 +170,17 @@ const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','A
 let state = { items: [], loans: [] };
 let cursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let page = 'month', editId = null, editLoanId = null, valueId = null, currentGroup = 'bills';
-let collapsedGroups = {};
-let hideValues = false; // Estado de ocultar/exibir valores
+
+// Carrega configurações guardadas no navegador
+let collapsedGroups = JSON.parse(localStorage.getItem('cf_collapsedGroups') || '{}');
+let hideValues = localStorage.getItem('cf_hideValues') === 'true';
+let allCollapsed = localStorage.getItem('cf_allCollapsed') === 'true';
+
+function savePreferences(){
+  localStorage.setItem('cf_collapsedGroups', JSON.stringify(collapsedGroups));
+  localStorage.setItem('cf_hideValues', hideValues);
+  localStorage.setItem('cf_allCollapsed', allCollapsed);
+}
 
 function showLoading(show){ document.getElementById('loading').classList.toggle('active', show); }
 
@@ -171,11 +203,9 @@ function save(){
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function key(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
-
-// Função money formatando e respeitando a flag de ocultar valores
-function money(v){ 
-  if (hideValues) return "••••••";
-  return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); 
+function money(v){
+  if (hideValues) return '••••••';
+  return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 function active(x){
@@ -226,24 +256,22 @@ function renderMonth(){
   [['Receitas', t.inc, 'green'], ['Despesas', t.exp, 'red'], ['Total Pago', t.paid, 'green'], ['Total a Pagar', t.pending, 'red'], ['Resultado Previsto', t.result, t.result >= 0 ? 'green' : 'red']]
   .forEach(c => h += `<div class="card"><small>${c[0]}</small><div class="money ${c[2]}">${money(c[1])}</div></div>`);
   
-  // Linha com o botão de Ocultar Valores e de PDF
-  h += `</section>
-  <div class="fabrow">
-    <button class="secondary" id="btnToggleHide" title="${hideValues ? 'Exibir Valores' : 'Ocultar Valores'}">
-      ${hideValues ? '🙈 Mostrar Valores' : '👁️ Ocultar Valores'}
-    </button>
+  h += `</section><div class="fabrow">
+    <button class="secondary" id="btnToggleHide">${hideValues ? '👁️ Exibir Valores' : '🙈 Ocultar Valores'}</button>
+    <button class="secondary" id="btnToggleAll">${allCollapsed ? '📂 Expandir Todos' : '📁 Recolher Todos'}</button>
     <button class="secondary" id="btnPdf">🧾 Gerar PDF Relatório</button>
   </div>`;
   
   for (const [g, title, color] of groups){
     const arr = items(g), total = arr.reduce((a, x) => a + val(x), 0);
     const isCollapsed = collapsedGroups[g] || false;
+    const valueColorClass = g === 'income' ? 'green' : 'red';
 
     h += `<section class="section">
       <div class="sectionhead">
         <button class="icon btnToggleGroup" data-group="${g}" title="${isCollapsed ? 'Expandir' : 'Recolher'}" style="font-size:13px;padding:4px 8px;font-weight:bold;">${isCollapsed ? '▶' : '▼'}</button>
         <h2 style="color:${color}">${title}</h2>
-        <span class="total" style="color:${color}">${money(total)}</span>
+        <span class="total ${valueColorClass}">${money(total)}</span>
         <button data-group="${g}" class="btnOpenForm" title="Adicionar item">＋</button>
       </div>`;
     
@@ -253,7 +281,7 @@ function renderMonth(){
         h += `<div class="item ${isPaid(x) ? 'paid' : ''}">
           <div><div class="name">${esc(x.name)}</div><div class="desc">${esc(x.desc)}</div></div>
           <span class="status">${isPaid(x) ? 'Pago' : 'A pagar'}</span>
-          <button class="valuebtn" data-id="${x.id}">${money(val(x))}</button>
+          <button class="valuebtn ${valueColorClass}" data-id="${x.id}">${money(val(x))}</button>
           <div class="controls">
             <button class="icon btnEditItem" title="Editar" data-group="${g}" data-id="${x.id}">✏️</button>
             <button class="icon btnRemoveItem" title="Excluir" data-id="${x.id}">🗑️</button>
@@ -264,7 +292,32 @@ function renderMonth(){
     }
     h += '</section>';
   }
-  h += `<section class="bottom"><b>Fechamento do mês</b><div class="bottomgrid"><div>Pago<b class="green">${money(t.paid)}</b></div><div>A pagar<b class="red">${money(t.pending)}</b></div><div>Resultado<b class="${t.result >= 0 ? 'green' : 'red'}">${money(t.result)}</b></div></div></section>`;
+
+  // Cálculo da Barra de Progresso de Orçamento
+  const percentUsed = t.inc > 0 ? Math.min(Math.round((t.exp / t.inc) * 100), 100) : (t.exp > 0 ? 100 : 0);
+  let barColor = '#18864b';
+  if (percentUsed > 75) barColor = '#e65100';
+  if (percentUsed >= 100) barColor = '#d63838';
+
+  h += `<section class="bottom">
+    <b>Fechamento do mês</b>
+    <div class="bottomgrid">
+      <div>Pago<b class="green">${money(t.paid)}</b></div>
+      <div>A pagar<b class="red">${money(t.pending)}</b></div>
+      <div>Resultado<b class="${t.result >= 0 ? 'green' : 'red'}">${money(t.result)}</b></div>
+    </div>
+    
+    <div class="progress-container">
+      <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:bold;">
+        <span>Uso do Orçamento (Despesas vs Receita)</span>
+        <span>${hideValues ? '••%' : percentUsed + '%'}</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" style="width:${percentUsed}%;background-color:${barColor};"></div>
+      </div>
+    </div>
+  </section>`;
+
   main.innerHTML = h;
   attachEvents();
 }
@@ -288,8 +341,8 @@ function renderLoans(){
         <div class="loan-info">
           <h3>${esc(loan.name)}</h3>
           <p><b>Tipo:</b> <span class="${color}">${typeLabel}</span></p>
-          <p><b>Valor da Parcela:</b> ${money(loan.installmentValue)} (${loan.totalInstallments}x)</p>
-          <p><b>Total do Empréstimo:</b> ${money(totalAmount)}</p>
+          <p><b>Valor da Parcela:</b> <span class="${color}">${money(loan.installmentValue)}</span> (${loan.totalInstallments}x)</p>
+          <p><b>Total do Empréstimo:</b> <span class="${color}">${money(totalAmount)}</span></p>
           <p><b>Mês de Início:</b> ${loan.startMonth}</p>
         </div>
         <div class="loan-actions">
@@ -306,7 +359,7 @@ function renderLoans(){
 
 function renderReports(){
   const t = totals();
-  main.innerHTML = `<section class="bottom"><h2>📊 Relatório</h2><p>${months[cursor.getMonth()]} ${cursor.getFullYear()}</p><table class="reporttable"><tr><th>Indicador</th><th>Valor</th></tr><tr><td>Receitas</td><td>${money(t.inc)}</td></tr><tr><td>Despesas</td><td>${money(t.exp)}</td></tr><tr><td>Total Pago</td><td>${money(t.paid)}</td></tr><tr><td>Total a Pagar</td><td>${money(t.pending)}</td></tr><tr><td>Resultado Previsto</td><td>${money(t.result)}</td></tr></table></section>`;
+  main.innerHTML = `<section class="bottom"><h2>📊 Relatório</h2><p>${months[cursor.getMonth()]} ${cursor.getFullYear()}</p><table class="reporttable"><tr><th>Indicador</th><th>Valor</th></tr><tr><td>Receitas</td><td class="green">${money(t.inc)}</td></tr><tr><td>Despesas</td><td class="red">${money(t.exp)}</td></tr><tr><td>Total Pago</td><td class="green">${money(t.paid)}</td></tr><tr><td>Total a Pagar</td><td class="red">${money(t.pending)}</td></tr><tr><td>Resultado Previsto</td><td class="${t.result >= 0 ? 'green' : 'red'}">${money(t.result)}</td></tr></table></section>`;
 }
 
 function find(id){ return state.items.find(x => x.id === id); }
@@ -330,15 +383,30 @@ function attachEvents(){
   document.querySelectorAll('.btnToggleGroup').forEach(b => b.onclick = e => {
     const g = e.currentTarget.dataset.group;
     collapsedGroups[g] = !collapsedGroups[g];
+    savePreferences();
     renderMonth();
   });
   
-  // Evento do novo botão de Ocultar/Mostrar Valores
-  const toggleBtn = document.getElementById('btnToggleHide');
-  if (toggleBtn) toggleBtn.onclick = () => {
-    hideValues = !hideValues;
-    renderMonth();
-  };
+  const toggleHideBtn = document.getElementById('btnToggleHide');
+  if (toggleHideBtn) {
+    toggleHideBtn.onclick = () => {
+      hideValues = !hideValues;
+      savePreferences();
+      render();
+    };
+  }
+
+  const toggleAllBtn = document.getElementById('btnToggleAll');
+  if (toggleAllBtn) {
+    toggleAllBtn.onclick = () => {
+      allCollapsed = !allCollapsed;
+      ['income', 'ap', 'bills', 'cards', 'payable'].forEach(g => {
+        collapsedGroups[g] = allCollapsed;
+      });
+      savePreferences();
+      renderMonth();
+    };
+  }
 
   const pdfBtn = document.getElementById('btnPdf'); if(pdfBtn) pdfBtn.onclick = pdf;
 }
@@ -462,6 +530,30 @@ forward.onclick = () => applyValue(true);
 prev.onclick = () => { cursor = new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1); render(); };
 next.onclick = () => { cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1); render(); };
 
+// Modal Seletor de Data Rápido
+const monthLabelBtn = document.getElementById('monthLabel');
+const datePickerModal = document.getElementById('datePickerModal');
+const selectMonth = document.getElementById('selectMonth');
+const selectYear = document.getElementById('selectYear');
+
+monthLabelBtn.onclick = () => {
+  selectMonth.value = cursor.getMonth();
+  selectYear.value = cursor.getFullYear();
+  datePickerModal.classList.add('show');
+};
+
+document.getElementById('datePickerCancel').onclick = () => datePickerModal.classList.remove('show');
+
+document.getElementById('datePickerApply').onclick = () => {
+  const m = parseInt(selectMonth.value);
+  const y = parseInt(selectYear.value);
+  if (Number.isFinite(m) && Number.isFinite(y)) {
+    cursor = new Date(y, m, 1);
+    render();
+  }
+  datePickerModal.classList.remove('show');
+};
+
 tabMonth.onclick = () => { page = 'month'; setTab(tabMonth); render(); };
 tabLoans.onclick = () => { page = 'loans'; setTab(tabLoans); render(); };
 tabReports.onclick = () => { page = 'reports'; setTab(tabReports); render(); };
@@ -482,11 +574,6 @@ function pdf(){
     ['payable', 'Empréstimos a pagar', '#d63838']
   ];
 
-  // Para o PDF, formatamos sempre mostrando os valores reais
-  function pdfMoney(v){
-    return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  }
-
   let tablesHtml = '';
 
   for (const [g, title, color] of groups){
@@ -497,7 +584,7 @@ function pdf(){
       <div style="margin-bottom:20px;">
         <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid ${color};padding-bottom:5px;margin-bottom:8px;">
           <h3 style="margin:0;color:${color};font-size:16px;">${title}</h3>
-          <span style="font-weight:bold;color:${color}">${pdfMoney(total)}</span>
+          <span style="font-weight:bold;color:${color}">${hideValues ? '••••••' : money(total)}</span>
         </div>
         ${arr.length === 0 ? '<p style="color:#777;font-size:12px;margin:5px 0;">Nenhum item cadastrado neste mês.</p>' : `
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -519,7 +606,7 @@ function pdf(){
                       ${isPaid(x) ? 'PAGO' : 'A PAGAR'}
                     </span>
                   </td>
-                  <td style="padding:6px;border-bottom:1px solid #eee;text-align:right;font-weight:bold;">${pdfMoney(val(x))}</td>
+                  <td style="padding:6px;border-bottom:1px solid #eee;text-align:right;font-weight:bold;">${hideValues ? '••••••' : money(val(x))}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -565,19 +652,19 @@ function pdf(){
       </div>
 
       <div class="summary-box">
-        <div class="summary-card"><small>Receitas</small><div class="green">${pdfMoney(t.inc)}</div></div>
-        <div class="summary-card"><small>Despesas</small><div class="red">${pdfMoney(t.exp)}</div></div>
-        <div class="summary-card"><small>Total Pago</small><div class="green">${pdfMoney(t.paid)}</div></div>
-        <div class="summary-card"><small>Total a Pagar</small><div class="red">${pdfMoney(t.pending)}</div></div>
-        <div class="summary-card"><small>Resultado</small><div class="${t.result >= 0 ? 'green' : 'red'}">${pdfMoney(t.result)}</div></div>
+        <div class="summary-card"><small>Receitas</small><div class="green">${hideValues ? '••••••' : money(t.inc)}</div></div>
+        <div class="summary-card"><small>Despesas</small><div class="red">${hideValues ? '••••••' : money(t.exp)}</div></div>
+        <div class="summary-card"><small>Total Pago</small><div class="green">${hideValues ? '••••••' : money(t.paid)}</div></div>
+        <div class="summary-card"><small>Total a Pagar</small><div class="red">${hideValues ? '••••••' : money(t.pending)}</div></div>
+        <div class="summary-card"><small>Resultado</small><div class="${t.result >= 0 ? 'green' : 'red'}">${hideValues ? '••••••' : money(t.result)}</div></div>
       </div>
 
       ${tablesHtml}
 
       <div class="footer-summary">
-        <span>Total Pago: <span class="green">${pdfMoney(t.paid)}</span></span>
-        <span>A Pagar: <span class="red">${pdfMoney(t.pending)}</span></span>
-        <span>Resultado Previsto: <span class="${t.result >= 0 ? 'green' : 'red'}">${pdfMoney(t.result)}</span></span>
+        <span>Total Pago: <span class="green">${hideValues ? '••••••' : money(t.paid)}</span></span>
+        <span>A Pagar: <span class="red">${hideValues ? '••••••' : money(t.pending)}</span></span>
+        <span>Resultado Previsto: <span class="${t.result >= 0 ? 'green' : 'red'}">${hideValues ? '••••••' : money(t.result)}</span></span>
       </div>
 
       <script>
